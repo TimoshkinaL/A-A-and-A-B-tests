@@ -1,0 +1,54 @@
+#A/A testing of a mobile application. It is necessary to calculate the results of the A / A test by checking the FPR quality metric (we will check for conversions to a purchase). The split system is known to be broken. It is required to check the statement about the breakdown and find its causes if the split system is really broken
+hw = pd.read_csv('/mnt/HC_Volume_18315164/home-jupyter/jupyter-i-timoshkin-23/Homeworks/Statistics/hw_aa.csv', sep=';')
+hw.head()
+hw[hw.experimentVariant == 1]['purchase']
+hw[hw.experimentVariant == 0]['purchase']
+
+#check split A/A for accuracy
+n = 100000
+simulations = 1000
+n_s = 1000
+res = []
+
+#Run A/A test simulations
+for i in tqdm(range(simulations)):
+    s1 = hw[hw.experimentVariant == 0]['purchase'].sample(n_s, replace = False).values
+    s2 = hw[hw.experimentVariant == 1]['purchase'].sample(n_s, replace = False).values
+    res.append(stats.ttest_ind(s1, s2, equal_var = False)[1]) # сохраняем pvalue
+
+plt.hist(res, bins = 50)
+plt.style.use('ggplot')
+plt.xlabel('pvalues')
+plt.ylabel('frequency')
+plt.title("Histogram of ttest A/A simulations ")
+plt.show()
+
+#Check that the number of false positives does not exceed alpha
+sum(np.array(res) <0.05) / simulations
+
+hw_1 = hw.groupby(['experimentVariant', 'version']).agg({'purchase':'mean', 'Unnamed: 0': 'count'}).reset_index().rename(columns={'purchase':'ctr'})
+hw[(hw.experimentVariant == 0) & (hw.version != 'v2.8.0')]['purchase']
+
+#check split A/A for precision
+n = 100000
+simulations = 1000
+n_s = 1000
+res = []
+
+#Run A/A test simulations
+for i in tqdm(range(simulations)):
+    s1 = hw[(hw.experimentVariant == 0) & (hw.version != 'v2.8.0')]['purchase'].sample(n_s, replace = False).values
+    s2 = hw[(hw.experimentVariant == 1) & (hw.version != 'v2.8.0')]['purchase'].sample(n_s, replace = False).values
+    res.append(stats.ttest_ind(s1, s2, equal_var = False)[1]) # сохраняем pvalue
+
+plt.hist(res, bins = 50)
+plt.style.use('ggplot')
+plt.xlabel('pvalues')
+plt.ylabel('frequency')
+plt.title("Histogram of ttest A/A simulations ")
+plt.show()
+
+#Check that the number of false positives does not exceed alpha
+sum(np.array(res) <0.05) / simulations
+
+#p-value < 0.05 inaccuracy detected
