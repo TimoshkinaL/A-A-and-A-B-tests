@@ -1,0 +1,77 @@
+#Bootstrap allows you to repeatedly extract subsamples from the sample obtained in the framework of the experiment. In the obtained subsamples, statistics (mean, median, etc.) are considered. From the statistics, you can get its distribution and take the confidence interval. CLT, for example, does not allow you to build a confidence interval for the median, but bootstrap can do this.
+import numpy as np
+import pandas as pd
+from scipy.stats import norm, mannwhitneyu
+import matplotlib.pyplot as plt
+
+from tqdm.auto import tqdm
+
+plt.style.use('ggplot')
+
+#Declare a function that will allow you to test hypotheses using the bootstrap
+def get_bootstrap(
+    data_column_1, #numeric values of the first sample
+    data_column_2, #numeric values of the second sample
+    boot_it = 1000, #number of bootstrap subsamples
+    statistic = np.mean, #the statistics we are interested in
+    bootstrap_conf_level = 0.95 #significance level
+):
+    boot_len = max([len(data_column_1), len(data_column_2)])
+    boot_data = []
+    for i in tqdm(range(boot_it)): #extract subsamples
+        samples_1 = data_column_1.sample(
+            boot_len, 
+            replace = True #return parameter
+        ).values
+        
+        samples_2 = data_column_2.sample(
+            boot_len, 
+            replace = True
+        ).values
+        
+        boot_data.append(statistic(samples_1-samples_2)) #mean() - apply statistics
+        
+    pd_boot_data = pd.DataFrame(boot_data)
+        
+    left_quant = (1 - bootstrap_conf_level)/2
+    right_quant = 1 - (1 - bootstrap_conf_level) / 2
+    ci = pd_boot_data.quantile([left_quant, right_quant])
+        
+    p_1 = norm.cdf(
+        x = 0, 
+        loc = np.mean(boot_data), 
+        scale = np.std(boot_data)
+    )
+    p_2 = norm.cdf(
+        x = 0, 
+        loc = -np.mean(boot_data), 
+        scale = np.std(boot_data)
+    )
+    p_value = min(p_1, p_2) * 2
+        
+    #Visualization
+    plt.hist(pd_boot_data[0], bins = 50)
+    
+    plt.style.use('ggplot')
+    plt.vlines(ci,ymin=0,ymax=50,linestyle='--')
+    plt.xlabel('boot_data')
+    plt.ylabel('frequency')
+    plt.title("Histogram of boot_data")
+    plt.show()
+       
+    return {"boot_data": boot_data, 
+            "ci": ci, 
+            "p_value": p_value}
+#we will try the bootstrap on the distribution experiment
+np.random.seed(5)
+
+n = 10000
+lift = 1.01
+
+x = np.random.exponential(size=n)
+y = np.random.exponential(size=n) * lift
+
+df = pd.DataFrame({"x": x, "y": y})
+booted_data = get_bootstrap(df.x, df.y, boot_it = 2000) #as a result, the difference of two distributions, DI and pvalue, is stored
+booted_data["p_value"]
+booted_data["ci"]
